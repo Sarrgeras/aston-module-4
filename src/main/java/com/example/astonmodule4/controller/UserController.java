@@ -20,66 +20,45 @@ public class UserController {
 
     private final UserService userService;
 
-    @GetMapping("/")
-    private List<UserResponse> getAllUsers() {
+    @GetMapping
+    public List<UserResponse> getAllUsers() {
         LOGGER.info("Getting all users process");
         List<UserResponse> users = userService.getAllUsers();
         LOGGER.debug("Getting count of users: {}", users.size());
         return users;
     }
 
-    @PostMapping("/")
-    private UserResponse createUser(@RequestBody @Valid CreateUserRequest userRequest) {
-
+    @PostMapping
+    public UserResponse createUser(@RequestBody @Valid CreateUserRequest userRequest) {
         LOGGER.info("Creating user process: email={}", userRequest.getEmail());
-        try {
-            UserResponse createdUser = userService.createUser(userRequest);
-            LOGGER.info("User created: ID={}, email={}", createdUser.getId(), createdUser.getEmail());
-            return userService.createUser(userRequest);
-        } catch (Exception e) {
-            LOGGER.error("Failed creating user: {}", e.getMessage());
-            throw new RuntimeException(e);
-        }
+        UserResponse createdUser = userService.createUser(userRequest);
+        LOGGER.info("User created: ID={}, email={}", createdUser.getId(), createdUser.getEmail());
+        return createdUser;
     }
 
     @PutMapping("/{id}")
-    private UserResponse updateUser(@PathVariable Long id,
-                                    @RequestBody @Valid UpdateUserRequest userRequest) {
+    public UserResponse updateUser(@PathVariable Long id,
+                                   @RequestBody @Valid UpdateUserRequest userRequest) {
         LOGGER.info("Updating user process: id={}", id);
-        try {
-            UserResponse updatedUser = userService.updateUser(id, userRequest);
-            LOGGER.info("User updated: ID={}, name={}, email={}", updatedUser.getId(), updatedUser.getName(), userRequest.getEmail());
-            return updatedUser;
-        } catch (Exception e) {
-            LOGGER.error("Failed updating user: {}", e.getMessage());
-            throw new RuntimeException(e);
-        }
-
+        UserResponse updatedUser = userService.updateUser(id, userRequest);
+        LOGGER.info("User updated: ID={}, name={}, email={}",
+                updatedUser.getId(), updatedUser.getName(), updatedUser.getEmail());
+        return updatedUser;
     }
 
     @GetMapping("/{id}")
-    private UserResponse getUser(@PathVariable Long id) {
+    public UserResponse getUser(@PathVariable Long id) {
         LOGGER.info("Getting user process: id={}", id);
-        try {
-            UserResponse gotUser = userService.getUserById(id);;
-            LOGGER.info("User got: ID={}, name={}, email={}", gotUser.getId(), gotUser.getName(), gotUser.getEmail());
-            return gotUser;
-        } catch (Exception e) {
-            LOGGER.error("Failed getting user: {}", e.getMessage());
-            throw new RuntimeException(e);
-        }
+        UserResponse gotUser = userService.getUserById(id);
+        LOGGER.info("User got: ID={}, name={}, email={}",
+                gotUser.getId(), gotUser.getName(), gotUser.getEmail());
+        return gotUser;
     }
 
     @DeleteMapping("/{id}")
-    private void deleteUser(@PathVariable Long id) {
+    public void deleteUser(@PathVariable Long id) {
         LOGGER.info("Deleting user process: id={}", id);
-        try {
-            LOGGER.info("User deleted: ID={}", id);
-            userService.deleteUser(id);
-        } catch (Exception e) {
-            LOGGER.error("Failed deleting user: {}", e.getMessage());
-            throw new RuntimeException(e);
-        }
-
+        userService.deleteUser(id);
+        LOGGER.info("User deleted: ID={}", id);
     }
 }

@@ -1,5 +1,9 @@
 package com.example.astonmodule4.controller;
 
+import com.example.astonmodule4.exception.UserAlreadyExistsException;
+import com.example.astonmodule4.exception.UserExceptionHandler;
+import com.example.astonmodule4.exception.UserNotFoundException;
+import com.example.astonmodule4.mapper.UserMapper;
 import com.example.astonmodule4.model.dto.request.CreateUserRequest;
 import com.example.astonmodule4.model.dto.request.UpdateUserRequest;
 import com.example.astonmodule4.model.dto.response.UserResponse;
@@ -13,6 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -23,11 +28,13 @@ import java.util.List;
 import static org.hamcrest.Matchers.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(UserController.class)
+@Import({UserExceptionHandler.class})
 class UserControllerTest {
 
     @Autowired
@@ -61,7 +68,7 @@ class UserControllerTest {
                 new UserResponse(2L, "Another User", "another@example.com", LocalDateTime.now())
         ));
 
-        mockMvc.perform(get("/users/"))
+        mockMvc.perform(get("/users"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(2)))
                 .andExpect(jsonPath("$[0].id", is(1)))
@@ -74,7 +81,7 @@ class UserControllerTest {
         CreateUserRequest request = new CreateUserRequest("New User", "new@example.com");
         when(userService.createUser(any(CreateUserRequest.class))).thenReturn(testUser);
 
-        mockMvc.perform(post("/users/")
+        mockMvc.perform(post("/users")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -114,6 +121,70 @@ class UserControllerTest {
 
         mockMvc.perform(delete("/users/1"))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void getUserById_UserNotFoundException() throws Exception {
+        when(userService.getUserById(999L))
+                .thenThrow(new UserNotFoundException(999L));
+
+        mockMvc.perform(get("/users/999"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code", is("NOT_FOUND")))
+                .andExpect(jsonPath("$.message", containsString("999")));
+    }
+
+    @Test
+    void updateUser_UserNotFoundException() throws Exception {
+        UpdateUserRequest request = new UpdateUserRequest("Updated Name", "updated@example.com");
+
+        when(userService.updateUser(eq(999L), any(UpdateUserRequest.class)))
+                .thenThrow(new UserNotFoundException(999L));
+
+        mockMvc.perform(put("/users/999")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code", is("NOT_FOUND")));
+    }
+
+    @Test
+    void deleteUser_UserNotFoundException() throws Exception {
+        doThrow(new UserNotFoundException(999L))
+                .when(userService).deleteUser(999L);
+
+        mockMvc.perform(delete("/users/999"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code", is("NOT_FOUND")));
+    }
+
+    @Test
+    void createUser_UserAlreadyExistsException() throws Exception {
+        CreateUserRequest request = new CreateUserRequest("Test User", "existing@example.com");
+
+        when(userService.createUser(any(CreateUserRequest.class)))
+                .thenThrow(new UserAlreadyExistsException("existing@example.com"));
+
+        mockMvc.perform(post("/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code", is("CONFLICT")))
+                .andExpect(jsonPath("$.message", containsString("existing@example.com")));
+    }
+
+    @Test
+    void updateUser_UserAlreadyExistsException() throws Exception {
+        UpdateUserRequest request = new UpdateUserRequest("Updated Name", "existing@example.com");
+
+        when(userService.updateUser(eq(1L), any(UpdateUserRequest.class)))
+                .thenThrow(new UserAlreadyExistsException("existing@example.com"));
+
+        mockMvc.perform(put("/users/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code", is("CONFLICT")));
     }
 
 }

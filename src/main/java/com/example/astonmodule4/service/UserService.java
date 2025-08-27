@@ -1,67 +1,94 @@
 package com.example.astonmodule4.service;
 
+import com.example.astonmodule4.exception.UserAlreadyExistsException;
+import com.example.astonmodule4.exception.UserNotFoundException;
+import com.example.astonmodule4.mapper.UserMapper;
 import com.example.astonmodule4.model.User;
 import com.example.astonmodule4.model.dto.request.CreateUserRequest;
 import com.example.astonmodule4.model.dto.request.UpdateUserRequest;
 import com.example.astonmodule4.model.dto.response.UserResponse;
 import com.example.astonmodule4.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class UserService {
 
     private final UserRepository userRepository;
+    private final UserMapper userMapper;
 
     public UserResponse createUser(CreateUserRequest userRequest) {
-        User user = new User();
-        user.setName(userRequest.getName());
-        user.setEmail(userRequest.getEmail());
-        user.setCreated_at(LocalDateTime.now());
+        log.info("Creating user with email: {}", userRequest.getEmail());
 
+        if (userRepository.existsByEmail(userRequest.getEmail())) {
+            log.warn("User with email {} already exists", userRequest.getEmail());
+            throw new UserAlreadyExistsException(userRequest.getEmail());
+        }
+
+        User user = userMapper.fromCreateRequest(userRequest);
         User savedUser = userRepository.save(user);
-        return convertToDto(savedUser);
+
+        log.info("User created successfully with ID: {}", savedUser.getId());
+        return userMapper.toResponse(savedUser);
     }
     public UserResponse getUserById(Long id) {
+        log.debug("Fetching user with ID: {}", id);
+
         User user = userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-        return convertToDto(user);
+                .orElseThrow(() -> {
+                    log.error("User not found with ID: {}", id);
+                    return new UserNotFoundException(id);
+                });
+
+        return userMapper.toResponse(user);
     }
 
     public UserResponse updateUser(Long id, UpdateUserRequest userRequest) {
+        log.info("Updating user with ID: {}", id);
+
         User user = userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-        if (userRequest.getName() != null) {
-            user.setName(userRequest.getName());
-        }
-        if (userRequest.getEmail() != null) {
-            user.setEmail(userRequest.getEmail());
+                .orElseThrow(() -> {
+                    log.error("User not found for update with ID: {}", id);
+                    return new UserNotFoundException(id);
+                });
+
+        if (userRequest.getEmail() != null &&
+                !userRequest.getEmail().equals(user.getEmail()) &&
+                userRepository.existsByEmail(userRequest.getEmail())) {
+            log.warn("Email {} already exists", userRequest.getEmail());
+            throw new UserAlreadyExistsException(userRequest.getEmail());
         }
 
+        userMapper.updateFromRequest(userRequest, user);
         User updatedUser = userRepository.save(user);
-        return convertToDto(updatedUser);
+
+        log.info("User with ID: {} updated successfully", id);
+        return userMapper.toResponse(updatedUser);
     }
 
     public List<UserResponse> getAllUsers() {
+        log.debug("Fetching all users");
         return userRepository.findAll().stream()
-                .map(this::convertToDto)
-                .collect(java.util.stream.Collectors.toList());
+                .map(userMapper::toResponse)
+                .collect(Collectors.toList());
     }
 
     public void deleteUser(Long id) {
-        userRepository.deleteById(id);
-    }
+        log.info("Deleting user with ID: {}", id);
 
-    private UserResponse convertToDto(User user) {
-        return UserResponse.builder()
-                .id(user.getId())
-                .name(user.getName())
-                .email(user.getEmail())
-                .createdAt(user.getCreated_at())
-                .build();
+        if (!userRepository.existsById(id)) {
+            log.error("User not found for deletion with ID: {}", id);
+            throw new UserNotFoundException(id);
+        }
+
+        userRepository.deleteById(id);
+        log.info("User with ID: {} deleted successfully", id);
     }
 }
