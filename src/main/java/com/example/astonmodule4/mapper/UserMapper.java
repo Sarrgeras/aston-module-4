@@ -8,17 +8,20 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 @Component
 @RequiredArgsConstructor
 public class UserMapper {
+    private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
+
 
     public UserResponse toResponse(User user) {
         return UserResponse.builder()
                 .id(user.getId())
                 .name(user.getName())
                 .email(user.getEmail())
-                .createdAt(user.getCreated_at())
+                .createdAt(formatDateTime(user.getCreated_at()))
                 .build();
     }
 
@@ -37,5 +40,9 @@ public class UserMapper {
         if (request.getEmail() != null) {
             user.setEmail(request.getEmail());
         }
+    }
+
+    private String formatDateTime(LocalDateTime dateTime) {
+        return dateTime != null ? dateTime.format(FORMATTER) : null;
     }
 }
